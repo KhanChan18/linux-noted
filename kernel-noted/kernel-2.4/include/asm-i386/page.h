@@ -36,6 +36,11 @@
 /*
  * These are used to make use of C type-checking..
  */
+
+// 这里定义的就是PGD, PMD, PTE的表项们
+// pte_val, pmd_val, pgd_val是访问方法
+// pgprot_val是访问表项的低12位
+//
 #if CONFIG_X86_PAE
 typedef struct { unsigned long pte_low, pte_high; } pte_t;
 typedef struct { unsigned long long pmd; } pmd_t;
@@ -78,6 +83,8 @@ typedef struct { unsigned long pgprot; } pgprot_t;
  * and CONFIG_HIGHMEM64G options in the kernel configuration.
  */
 
+// 这个地址可以看成是内核空间的起点，用户空间的终点
+//
 #define __PAGE_OFFSET		(0xC0000000)
 
 #ifndef __ASSEMBLY__
@@ -111,9 +118,15 @@ extern __inline__ int get_order(unsigned long size)
 
 #endif /* __ASSEMBLY__ */
 
+
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
+// 从pa, va两个宏来看，给定一个虚拟地址，它与物理地址之间的转化就是+/- 0xc0000
+//
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
+//
+// virt_to_page是从一个虚拟地址映射到对应的物理页面指针*page_t
+//
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 

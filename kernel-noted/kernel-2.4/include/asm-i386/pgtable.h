@@ -102,6 +102,10 @@ extern unsigned long empty_zero_page[1024];
  * implements both the traditional 2-level x86 page tables and the
  * newer 3-level PAE-mode page tables.
  */
+
+// 这里从编译选项上控制了从虚拟地址到物理地址究竟是
+// 三层映射PGD->PMD->PT，还是两层映射PGD->PT
+//
 #ifndef __ASSEMBLY__
 #if CONFIG_X86_PAE
 # include <asm/pgtable-3level.h>
@@ -114,6 +118,10 @@ extern unsigned long empty_zero_page[1024];
 
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
+
+// 这里PGDIR_SIZE = 1 * (2 ** 22) 这样，每个固定的PGD就能
+// 容纳2 ** 22个完全不同的地址。
+//
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
@@ -159,6 +167,8 @@ extern unsigned long empty_zero_page[1024];
 #define _PAGE_BIT_PSE		7	/* 4 MB (or 2MB) page, Pentium+, if present.. */
 #define _PAGE_BIT_GLOBAL	8	/* Global TLB entry PPro+ */
 
+// 这里的标志位解释了pgprot的含义
+//
 #define _PAGE_PRESENT	0x001
 #define _PAGE_RW	0x002
 #define _PAGE_USER	0x004
@@ -245,6 +255,8 @@ extern unsigned long pg0[1024];
 extern void __handle_bad_pmd(pmd_t * pmd);
 extern void __handle_bad_pmd_kernel(pmd_t * pmd);
 
+// 检验一个pte是否已经建立了映射，但是所指向的物理页面不
+// 位于内存中
 #define pte_present(x)	((x).pte_low & (_PAGE_PRESENT | _PAGE_PROTNONE))
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
 
@@ -264,6 +276,7 @@ extern void __handle_bad_pmd_kernel(pmd_t * pmd);
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
+
 static inline int pte_read(pte_t pte)		{ return (pte).pte_low & _PAGE_USER; }
 static inline int pte_exec(pte_t pte)		{ return (pte).pte_low & _PAGE_USER; }
 static inline int pte_dirty(pte_t pte)		{ return (pte).pte_low & _PAGE_DIRTY; }

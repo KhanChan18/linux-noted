@@ -258,6 +258,9 @@ extern unsigned int mca_pentium_flag;
 /*
  * User space process size: 3GB (default).
  */
+
+// 这里可以看到TASK_SIZE就是PAGE_OFFSET, TASK_SIZE定义了用户空间的
+// 上限
 #define TASK_SIZE	(PAGE_OFFSET)
 
 /* This decides where the kernel will search for a free chunk of vm
@@ -405,6 +408,10 @@ struct thread_struct {
 	{~0, } /* ioperm */					\
 }
 
+// 这里是内核在建立一个新进程时初始化寄存器的逻辑
+// 可以看到ds, es, ss寄存器初始值都是USER_DS
+//
+//
 #define start_thread(regs, new_eip, new_esp) do {		\
 	__asm__("movl %0,%%fs ; movl %0,%%gs": :"r" (0));	\
 	set_fs(USER_DS);					\

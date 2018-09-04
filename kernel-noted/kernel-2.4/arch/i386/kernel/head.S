@@ -447,6 +447,9 @@ ALIGN
  * NOTE! Make sure the gdt descriptor in head.S matches this if you
  * change anything.
  */
+
+// 这里是GDT表的定义，主要内容在运行中不改变
+//
 ENTRY(gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* not used */
