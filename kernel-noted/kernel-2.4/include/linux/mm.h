@@ -38,18 +38,49 @@ extern struct list_head inactive_dirty_list;
  * space that has a special rule for the page-fault handlers (ie a shared
  * library, the executable area etc).
  */
+
+//
+// 这里定义了虚拟内存页面，虚拟内存才是程序运行时期依赖的
+// 内存页面。和物理没面肯定不是对应的关系，因为虚拟内存有
+// 交换之说，这样每个虚拟内存页面就必然体现交换的逻辑。物理
+// 页面则不是。
+//
+// 一个进程所使用的虚拟内存未必是连续的！很可能是若干个
+// 彼此不相邻的区域组合成的，这其中的一个组成单元就要用
+// 一个vm_area_struct来表示。
+//
 struct vm_area_struct {
+    //
+    // 用来指向一个mm_struct
+    //
 	struct mm_struct * vm_mm;	/* VM area parameters */
-	unsigned long vm_start;
+	//
+    // [vm_start, vm_end)是一个虚存区域的地址范围
+    // 能被划分到这个区域的虚存页面不仅仅是连续的，
+    // 而且它们的保护属性还都相同。
+    //
+    unsigned long vm_start;
 	unsigned long vm_end;
 
 	/* linked list of VM areas per task, sorted by address */
+    //
+    // 一个进程的所有虚存区间会按照地址的高低顺序链接起来，
+    // vm_next是它们形成了单向链表的标志
+    //
 	struct vm_area_struct *vm_next;
 
+    //
+    // 这就是所谓的，一个vma中的保护属性。
+    //
 	pgprot_t vm_page_prot;
 	unsigned long vm_flags;
 
 	/* AVL tree of VM areas per task, sorted by address */
+    //
+    // 每个vma都会作为进程中维护的一颗AVL树而存在。由于vma数量不少
+    // 所以维护一颗AVL树才具有搜索上的优势，所以从这个角度看vma也可以
+    // 视作虚拟页面的数据结构。
+    //
 	short vm_avl_height;
 	struct vm_area_struct * vm_avl_left;
 	struct vm_area_struct * vm_avl_right;
@@ -58,9 +89,14 @@ struct vm_area_struct {
 	 * one of the address_space->i_mmap{,shared} lists,
 	 * for shm areas, the list of attaches, otherwise unused.
 	 */
+    //
+    // 这是为了更好地处理mmap系统而引入的字段
+    //
 	struct vm_area_struct *vm_next_share;
 	struct vm_area_struct **vm_pprev_share;
 
+    // 函数集合，用来定义甚至是订制不同vma所满足的不同操作
+    //
 	struct vm_operations_struct * vm_ops;
 	unsigned long vm_pgoff;		/* offset in PAGE_SIZE units, *not* PAGE_CACHE_SIZE */
 	struct file * vm_file;
@@ -117,6 +153,11 @@ extern pgprot_t protection_map[16];
  * unmapping it (needed to keep files on disk up-to-date etc), pointer
  * to the functions called when a no-page or a wp-page exception occurs. 
  */
+
+//
+// 相当于一个抽象类，实现不同的抽象类可以个性化open, close和page_fault_handler
+// 从而定义出具有不同性质的vma。
+//
 struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);
 	void (*close)(struct vm_area_struct * area);

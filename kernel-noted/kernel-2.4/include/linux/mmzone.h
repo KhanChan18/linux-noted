@@ -20,12 +20,21 @@ typedef struct free_area_struct {
 } free_area_t;
 
 struct pglist_data;
-
+//
+// mem_map是内存中所有物理页面的数组
+// 一般这个数组中的页面会被分成两个zone
+// zone_dma和zone_normal，每个zone的数据结构
+// 就是下面这样
+//
 typedef struct zone_struct {
 	/*
 	 * Commonly accessed fields:
 	 */
 	spinlock_t		lock;
+    //
+    // offset是一个可以在mem_map中找到的索引值，用来表达
+    // 一个zone_struct的起点。
+    //
 	unsigned long		offset;
 	unsigned long		free_pages;
 	unsigned long		inactive_clean_pages;
@@ -36,6 +45,12 @@ typedef struct zone_struct {
 	 * free areas of different sizes
 	 */
 	struct list_head	inactive_clean_list;
+    //
+    // 每个zone中会有一个长度是MAX_ORDER的数组，
+    // 每个数组都是用来保存一些个数是2 ** (index + 1)
+    // 并且连续的页面，每个称为一个块，同一大小的
+    // 块被组织成队列。free_area_t中的list_head就是队列的标志。
+    //
 	free_area_t		free_area[MAX_ORDER];
 
 	/*
@@ -46,6 +61,10 @@ typedef struct zone_struct {
 	/*
 	 * Discontig memory support fields.
 	 */
+    //
+    // 这个用来指向所属节点的pglist_data结构，从zone到
+    // pglist_data的引用
+    //
 	struct pglist_data	*zone_pgdat;
 	unsigned long		zone_start_paddr;
 	unsigned long		zone_start_mapnr;
@@ -55,6 +74,9 @@ typedef struct zone_struct {
 #define ZONE_DMA		0
 #define ZONE_NORMAL		1
 #define ZONE_HIGHMEM		2
+//
+// 这里定义了每个存储节点中所能具有的zone的最大数量
+//
 #define MAX_NR_ZONES		3
 
 /*
@@ -68,6 +90,11 @@ typedef struct zone_struct {
  * so despite the zonelist table being relatively big, the cache
  * footprint of this construct is very small.
  */
+
+//
+// 这个zonelist_t相当于保存了一个策略，zone[0]是分配页面时的目标
+// 区域，而zone[1], zone[2], zone[3]则是zone[0]的后被管理区。
+//
 typedef struct zonelist_struct {
 	zone_t * zones [MAX_NR_ZONES+1]; // NULL delimited
 	int gfp_mask;
@@ -76,9 +103,28 @@ typedef struct zonelist_struct {
 #define NR_GFPINDEX		0x100
 
 struct bootmem_data;
+//
+// 出现了NUMA结构之后，由于现在有了多个CPU（其实原因是
+// 多个CPU每一个都有独立的本地内存，并且可能出现一块共享内存）
+// 此时每个page结构不再是全局性的了，其实这个时候每个存储节点
+// 都有自己的mem_map数组。
+//
+// pglist_data就是这样一个描述存储节点的结构
+//
 typedef struct pglist_data {
+    //
+    // 数组中装着对存储节点上的管理区的结构体zone_t
+    // 配合73行左右的宏来看每个存储节点最多三个管理区
+    //
 	zone_t node_zones[MAX_NR_ZONES];
+    //
+    // NR_GFPINDEX = 256, 是说每个存储节点最大支持
+    // 256种策略。
+    //
 	zonelist_t node_zonelists[NR_GFPINDEX];
+    //
+    // 这里是每个存储节点自己的mem_map
+    //
 	struct page *node_mem_map;
 	unsigned long *valid_addr_bitmap;
 	struct bootmem_data *bdata;
@@ -86,6 +132,9 @@ typedef struct pglist_data {
 	unsigned long node_start_mapnr;
 	unsigned long node_size;
 	int node_id;
+    //
+    // 用来将所有pglist_data串联起来的单链表
+    //
 	struct pglist_data *node_next;
 } pg_data_t;
 

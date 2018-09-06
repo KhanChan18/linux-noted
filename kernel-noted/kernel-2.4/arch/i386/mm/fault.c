@@ -103,6 +103,10 @@ extern unsigned long idt;
  *	bit 1 == 0 means read, 1 means write
  *	bit 2 == 0 means kernel, 1 means user-mode
  */
+
+// 这里的pte_regs和error_code，前者保存了错误发生前夕各个寄存器的
+// 具体值。error_code指的是错误码。
+//
 asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
 	struct task_struct *tsk;
@@ -115,8 +119,14 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	siginfo_t info;
 
 	/* get the address */
+    //
+    // "the address" 是i386CPU产生Page Fault时，会将产生错误的
+    // 地址放入CR2。这里用内联汇编读CR2就是取出这个错误。
+    //
 	__asm__("movl %%cr2,%0":"=r" (address));
 
+    // current是一个宏，总是会返回当前正在操作中的
+    // task_struct
 	tsk = current;
 
 	/*
@@ -131,6 +141,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (address >= TASK_SIZE)
 		goto vmalloc_fault;
 
+    // 有了task_struct之后，就可以获得其mm_struct结构
 	mm = tsk->mm;
 	info.si_code = SEGV_MAPERR;
 
@@ -138,6 +149,9 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
 	 */
+    
+    // in_interrupte()不为0说明此次映射的失败发生某个
+    // 中断服务中，和当前的进程没有关系。
 	if (in_interrupt() || !mm)
 		goto no_context;
 

@@ -404,20 +404,39 @@ unsigned long get_unmapped_area(unsigned long addr, unsigned long len)
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
 struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 {
+    //
+    // find_vma操作必须要同时有一个具体的mm_struct和一个具体的虚拟addr
+    // 也就是说，谈及虚拟地址必须要谈它在哪个进程中。
+    //
 	struct vm_area_struct *vma = NULL;
 
 	if (mm) {
 		/* Check the cache first. */
 		/* (Cache hit rate is typically around 35%.) */
+        //
+        // 首先观察mm结构中的mmap_cache字段，
+        // 获取上一次操作的虚拟页面
+        //
 		vma = mm->mmap_cache;
+        //
+        // 1. vma = null
+        // 2. vma 的起始地址没有包含需要查找的addr
+        // 上述条件有一个不成立（其实是递进关系）
+        // 则继续查找
+        //
 		if (!(vma && vma->vm_end > addr && vma->vm_start <= addr)) {
 			if (!mm->mmap_avl) {
 				/* Go through the linear list. */
+                // 这个分支说明：mm中没有avl树的存在
 				vma = mm->mmap;
+                // 如果队列中的vma不能包含住传入的addr就检验下一个
 				while (vma && vma->vm_end <= addr)
 					vma = vma->vm_next;
 			} else {
 				/* Then go through the AVL tree quickly. */
+                //
+                // 说明mm中有avl
+                //
 				struct vm_area_struct * tree = mm->mmap_avl;
 				vma = NULL;
 				for (;;) {
@@ -432,6 +451,7 @@ struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 						tree = tree->vm_avl_right;
 				}
 			}
+            // 找到vma之后，将它缓存
 			if (vma)
 				mm->mmap_cache = vma;
 		}

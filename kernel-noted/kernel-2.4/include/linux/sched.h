@@ -200,19 +200,40 @@ struct files_struct {
 /* Number of map areas at which the AVL tree is activated. This is arbitrary. */
 #define AVL_MIN_MAP_COUNT	32
 
+//
+// 每个进程只有一个mm_struct，可以认为这是每个进程的控制结构体
+// 抽象了整个的用户空间。
+//
+// 但是一个mm_struct却可以被很多进程共享，例如clone一个新进程时，
+// 共享mm_struct就十分合理。
+//
+// vma也好，mm也罢，描述的都是程序对于内存空间的需求罢了，一个虚拟
+// 地址完全有可能映射到一个不在内存中的物理地址上去，然后引发一个
+// PageFault。
+//
+
 struct mm_struct {
+    // vma的单链表队列
 	struct vm_area_struct * mmap;		/* list of VMAs */
+    // vma的avl树
 	struct vm_area_struct * mmap_avl;	/* tree of VMAs */
+    // 最近一次使用的vma的引用（体现了局部性假设）
 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
+    // 指向一个进程中的PGD的地址，每当一个进程被调度时，内核就会把这个
+    // 值__pa(pgd)，变成一个物理地址，存入CR3寄存器
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
-	int map_count;				/* number of VMAs */
+	//
+    // 队列的长度len(mmap) = num(mmap_avl)
+    //
+    int map_count;				/* number of VMAs */
 	struct semaphore mmap_sem;
 	spinlock_t page_table_lock;
 
 	struct list_head mmlist;		/* List of all active mm's */
 
+    // 代码段和数据段的起点和终点
 	unsigned long start_code, end_code, start_data, end_data;
 	unsigned long start_brk, brk, start_stack;
 	unsigned long arg_start, arg_end, env_start, env_end;
