@@ -155,15 +155,55 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (in_interrupt() || !mm)
 		goto no_context;
 
+    // 对信号量的P/V的操作
 	down(&mm->mmap_sem);
 
+    // 在给定的mm中找到第一个具有大于address
+    // 的vm_end的vma，返回它
 	vma = find_vma(mm, address);
+    //     |-----------------|
+    //     |                 |
+    //     | kernel space 1G |
+    //     | 2               |
+    //     |-----------------|
+    //     | 1(stack seg)    |
+    //     | *(%esp)         | * Now the top of the stack is at the limbo
+    //     |                 |   between stack segment and hole area in user
+    //     | 4(hole area)    |   space.
+    //     | user space 3G   |
+    //     |                 |   If the stack will be pushed now, since the stack
+    //     |                 |   will grow down towards the code & data segments at 
+    //     |                 |   the bottom of user space, techinically, the address
+    //     | 3(code&data seg)|   will be mapped into hole area. So we cross the line.
+    //     |-----------------|   **This will generate vma->vma_flags & VM_GROWSDOWN
+    //                             = 1
+    //
+    // 现在的任务是确定address具体在哪个位置, 1, 2, 3, 4
+    // 都有不同的处理方式
+    //
+    // find_vma没有返回任何一个vma引用，说明此时address
+    // 会被映射到kernel space肯定是一次越界行为。
+    //
 	if (!vma)
 		goto bad_area;
+    //
+    // 说明映射成功了，此时返回的vma已经满足address包含在
+    // [vm_start, vm_end)里，映射已经建立了，具体的错误原因
+    // 不在寻址上。
+    //
 	if (vma->vm_start <= address)
 		goto good_area;
+    //
+    // 检验address是否落入了堆栈区和代码区之间的空洞里
+    // vma->vm_flags & VM_GROWSDOWN = 1 说明确实落入了
+    // 这个区域。
+    //
+    // 若为0，则说明此地址落入的空洞是由于映射的撤销而
+    // 产生的，并非是落入了空洞区。
+    //
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
+    // 到了这里，说明越界行为发生在堆栈区的下方
 	if (error_code & 4) {
 		/*
 		 * accessing the stack below %esp is always a bug.
@@ -171,9 +211,21 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		 * pusha) doing post-decrement on the stack and that
 		 * doesn't show up until later..
 		 */
+        //
+        // 直接访问堆栈区以下的内存肯定是非法的，但是有些压栈
+        // 指令会造成32字节的地址变化，所以会有%esp-32的情况发生，
+        // 很容易产生所谓的越界行为，只能特殊对待。
+        //
+        // addr + 32仍然小于栈顶说明address越界太远了，已经不是特殊
+        // 情况了。
+        //
 		if (address + 32 < regs->esp)
 			goto bad_area;
 	}
+
+    // 我们讨论的情形能保证被判定成一次特殊情况，所以能到达
+    // 这里。这样就会触发一次栈扩展
+    //
 	if (expand_stack(vma, address))
 		goto bad_area;
 /*
@@ -241,13 +293,18 @@ bad_area:
 bad_area_nosemaphore:
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
+        // 此时error_code的bit(index=2) = 1，说明失败时
+        // CPU处在用户模式。
 		tsk->thread.cr2 = address;
 		tsk->thread.error_code = error_code;
 		tsk->thread.trap_no = 14;
+
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		/* info.si_code has been set above */
 		info.si_addr = (void *)address;
+
+        // 这里会发送SIGSEGV到进程，软中断
 		force_sig_info(SIGSEGV, &info, tsk);
 		return;
 	}

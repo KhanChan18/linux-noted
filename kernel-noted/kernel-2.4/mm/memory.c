@@ -1058,7 +1058,9 @@ static int do_swap_page(struct mm_struct * mm,
 /*
  * This only needs the MM semaphore
  */
-static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma, pte_t *page_table, int write_access, unsigned long addr)
+static int do_anonymous_page(
+        struct mm_struct * mm, struct vm_area_struct * vma,
+        pte_t *page_table, int write_access, unsigned long addr)
 {
 	struct page *page = NULL;
 	pte_t entry = pte_wrprotect(mk_pte(ZERO_PAGE(addr), vma->vm_page_prot));
@@ -1093,7 +1095,9 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 {
 	struct page * new_page;
 	pte_t entry;
-
+    // 此时的场景仅仅和堆栈区有关，
+    // 不会存在页面共享之类的问题
+    // 所以会执行do_anonymous_page
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
 		return do_anonymous_page(mm, vma, page_table, write_access, address);
 
@@ -1154,6 +1158,11 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 	struct vm_area_struct * vma, unsigned long address,
 	int write_access, pte_t * pte)
 {
+    // 我们讨论的情况中：
+    // 1. 如果页表是新分配的，当然其中的所有pagetable_entry都是空的；
+    // 2. 如果页表不是新分配的，那么page fault说明对应的pagetable_entry是空的；
+    // 怎么都是空的
+    //
 	pte_t entry;
 
 	/*
@@ -1162,6 +1171,10 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 	 */
 	spin_lock(&mm->page_table_lock);
 	entry = *pte;
+    // 
+    // 判断当前的pte所对应的物理页面是否在内存中，这里还没有分配
+    // 物理页面所以一定为真
+    //
 	if (!pte_present(entry)) {
 		/*
 		 * If it truly wasn't present, we know that kswapd
@@ -1169,6 +1182,9 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 		 * drop the lock.
 		 */
 		spin_unlock(&mm->page_table_lock);
+        //
+        // 测试一个表项是否为空，没分配肯定是空的
+        //
 		if (pte_none(entry))
 			return do_no_page(mm, vma, address, write_access, pte);
 		return do_swap_page(mm, vma, address, pte, pte_to_swp_entry(entry), write_access);
@@ -1194,6 +1210,8 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 {
 	int ret = -1;
 	pgd_t *pgd;
+
+    // 对于i386见include/asm-i386/pgtable_2level.h中的定义
 	pmd_t *pmd;
 
 	pgd = pgd_offset(mm, address);

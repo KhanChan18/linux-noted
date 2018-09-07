@@ -119,22 +119,33 @@ extern inline pte_t * pte_alloc_kernel(pmd_t * pmd, unsigned long address)
 
 extern inline pte_t * pte_alloc(pmd_t * pmd, unsigned long address)
 {
+    // 从虚拟地址解析到对应页表的下标
 	address = (address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1);
 
+    // 讨论时不妨假定pmd此时为空，则会转到getnew处
 	if (pmd_none(*pmd))
 		goto getnew;
 	if (pmd_bad(*pmd))
 		goto fix;
 	return (pte_t *)pmd_page(*pmd) + address;
+
 getnew:
 {
+    // 优先使用get_pte_fast从缓冲中分配一个物理页面
+    // 这个物理页面是当作页表使用的
 	unsigned long page = (unsigned long) get_pte_fast();
 	
 	if (!page)
+        // 缓冲无法提供则需要真正地分配一个，可能会很慢
 		return get_pte_slow(pmd, address);
+
+    // i386上这实际上是将这个物理页面的起始地址写道pgd中
+    // 因为i386中只有一个pmd
+    //
 	set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(page)));
 	return (pte_t *)page + address;
 }
+
 fix:
 	__handle_bad_pmd(pmd);
 	return NULL;

@@ -535,6 +535,10 @@ extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
 /* vma is the first one with  address < vma->vm_end,
  * and even  address < vma->vm_start. Have to extend vma. */
+
+//
+// 扩展堆栈区时还是要确定具体的进程和虚拟地址
+//
 static inline int expand_stack(struct vm_area_struct * vma, unsigned long address)
 {
 	unsigned long grow;

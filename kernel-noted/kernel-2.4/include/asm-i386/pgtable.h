@@ -326,6 +326,9 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #define __pgd_offset(address) pgd_index(address)
 
+//
+// 从一个虚拟地址解析出它所属的物理页面对应的PGD
+//
 #define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
 /* to find an entry in a kernel page-table-directory */

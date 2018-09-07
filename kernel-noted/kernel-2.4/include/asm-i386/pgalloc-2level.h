@@ -13,6 +13,11 @@ extern __inline__ pmd_t *get_pmd_fast(void)
 extern __inline__ void free_pmd_fast(pmd_t *pmd) { }
 extern __inline__ void free_pmd_slow(pmd_t *pmd) { }
 
+
+//
+// 可见这里被直接定义return (pmd_t *) pgd
+// 说明i386没有实际的中间目录的概念。
+//
 extern inline pmd_t * pmd_alloc(pgd_t *pgd, unsigned long address)
 {
 	if (!pgd)
