@@ -293,12 +293,16 @@ void recalculate_vm_stats(void)
 /*
  * Perform any setup for the swap system
  */
+
+//
+// kswapd进程启动时用来决定page_cluster的值
+//
 void __init swap_setup(void)
 {
 	/* Use a smaller cluster for memory <16MB or <32MB */
-	if (num_physpages < ((16 * 1024 * 1024) >> PAGE_SHIFT))
+	if (num_physpages < ((16 * 1024 * 1024) >> PAGE_SHIFT)) // 16 * (1024) ^ 2 >> 12 = 64G
 		page_cluster = 2;
-	else if (num_physpages < ((32 * 1024 * 1024) >> PAGE_SHIFT))
+	else if (num_physpages < ((32 * 1024 * 1024) >> PAGE_SHIFT)) // 128G
 		page_cluster = 3;
 	else
 		page_cluster = 4;

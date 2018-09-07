@@ -149,6 +149,8 @@ static inline void init_waitqueue_entry(wait_queue_t *q,
 #endif
 }
 
+// 用来查看kswapd_done队列中是否还有函数在
+// 等待执行
 static inline int waitqueue_active(wait_queue_head_t *q)
 {
 #if WAITQUEUE_DEBUG
@@ -157,6 +159,7 @@ static inline int waitqueue_active(wait_queue_head_t *q)
 	CHECK_MAGIC_WQHEAD(q);
 #endif
 
+    // 简单地判断下队列空不空就行
 	return !list_empty(&q->task_list);
 }
 

@@ -495,19 +495,29 @@ int page_launder(int gfp_mask, int sync)
 	 */
 	can_get_io_locks = gfp_mask & __GFP_IO;
 
+    // 用来控制扫描的次数
 	launder_loop = 0;
 	maxlaunder = 0;
+
+    // 这个变量用来累计被洗净的页面数量
 	cleaned_pages = 0;
 
 dirty_page_rescan:
 	spin_lock(&pagemap_lru_lock);
+
+    // dirty_page_rescan流程有上限maxscan
+    // 控制条件是maxscan-- > 0
+    //
+    // 一般是用来防止死循环的出现
+    //
 	maxscan = nr_inactive_dirty_pages;
 	while ((page_lru = inactive_dirty_list.prev) != &inactive_dirty_list &&
 				maxscan-- > 0) {
 		page = list_entry(page_lru, struct page, lru);
 
 		/* Wrong page on list?! (list corruption, should not happen) */
-		if (!PageInactiveDirty(page)) {
+		// 必须有inactive_dirty标志位，否则都是无效页面
+        if (!PageInactiveDirty(page)) {
 			printk("VM: page_launder, wrong page on list.\n");
 			list_del(page_lru);
 			nr_inactive_dirty_pages--;
@@ -772,6 +782,10 @@ int refill_inactive_scan(unsigned int priority, int oneshot)
  * Check if there are zones with a severe shortage of free pages,
  * or if all zones have a minor shortage.
  */
+
+//
+// 查看各个管理区里，是否存在空闲页面的短缺
+//
 int free_shortage(void)
 {
 	pg_data_t *pgdat = pgdat_list;
@@ -780,22 +794,32 @@ int free_shortage(void)
 	int freetarget = freepages.high + inactive_target / 3;
 
 	/* Are we low on free pages globally? */
+    //
+    // 如果供应页面量（物理页面）少于目标页面量（虚拟页面）
+    // 说明发生了页面的短缺（全局性的短缺）
+    //
 	if (freeable < freetarget)
 		return freetarget - freeable;
 
 	/* If not, are we very low on any particular zone? */
 	do {
 		int i;
+        // MAX_NR_ZONES是每个pgdata结构中所能持有的管理区的最大数量
+        // MAX_NR_ZONES = 3
 		for(i = 0; i < MAX_NR_ZONES; i++) {
-			zone_t *zone = pgdat->node_zones+ i;
+			zone_t *zone = pgdat->node_zones + i;
 			if (zone->size && (zone->inactive_clean_pages +
 					zone->free_pages < zone->pages_min+1)) {
 				/* + 1 to have overlap with alloc_pages() !! */
+                // 对于短缺的判断逻辑和全局类似：
+                // pages_min + 1是页面消耗侧，
+                // 空闲和干净不活跃页面是供应侧
 				sum += zone->pages_min + 1;
 				sum -= zone->free_pages;
 				sum -= zone->inactive_clean_pages;
 			}
 		}
+        // 可以看出是在遍历整个pgdata下的所有zone，
 		pgdat = pgdat->node_next;
 	} while (pgdat);
 
@@ -805,16 +829,30 @@ int free_shortage(void)
 /*
  * How many inactive pages are we short?
  */
+//
+// 检查内存中可以分配的物理页面是否短缺
+//
 int inactive_shortage(void)
 {
 	int shortage = 0;
 
+    // 这里的计算方法表达了页面短缺的构成：
+    // 1. freepages.high和inactivate_target
+    // 代表了潜在的页面供应量；
+    //
+    // 2. 而这些物理页面同时又会被虚拟页面使用
+    // 一共有三种使用途径：
+    // a. nr_free_pages, 各个页面管理区中不同大小的块；
+    // b. nr_inactive_clean_pages 不活跃的干净页面；
+    // c. nr_inactive_dirty_pages 不活跃的脏页面
+    //
 	shortage += freepages.high;
 	shortage += inactive_target;
 	shortage -= nr_free_pages();
 	shortage -= nr_inactive_clean_pages();
 	shortage -= nr_inactive_dirty_pages;
 
+    // 返回值为正则说明还有的分配，不算短缺
 	if (shortage > 0)
 		return shortage;
 
@@ -916,6 +954,15 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	 * before we get around to moving them to the other
 	 * list, so this is a relatively cheap operation.
 	 */
+
+    // 如果当前的物理页面确实是剩余的，
+    // free_shortage()如果返回值为正，则说明出现了全局性的
+    // 或者某个管理区以内的页面短缺。
+    //
+    // 或者不活跃脏页面的数量大于空闲页面和不活跃干净页面
+    // (这种大于的情况说明, 需要从inactive_dirty_pages里面洗干净一些页面)
+    // 则进行page_launder
+    //
 	if (free_shortage() || nr_inactive_dirty_pages > nr_free_pages() +
 			nr_inactive_clean_pages())
 		ret += page_launder(gfp_mask, user);
@@ -925,6 +972,7 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	 * to the inactive list. We also "eat" pages from
 	 * the inode and dentry cache whenever we do this.
 	 */
+
 	if (free_shortage() || inactive_shortage()) {
 		shrink_dcache_memory(6, gfp_mask);
 		shrink_icache_memory(6, gfp_mask);
@@ -959,6 +1007,7 @@ struct task_struct *kswapd_task;
  */
 int kswapd(void *unused)
 {
+    // 线程的code部分
 	struct task_struct *tsk = current;
 
 	tsk->session = 1;
@@ -989,6 +1038,8 @@ int kswapd(void *unused)
 
 		/* If needed, try to free some memory. */
 		if (inactive_shortage() || free_shortage()) {
+            // 如果能通过测试走到这里，说明此时全局和
+            // pgdata下的每个管理区都不存在页面的短缺
 			int wait = 0;
 			/* Do we need to do some synchronous flushing? */
 			if (waitqueue_active(&kswapd_done))
@@ -1029,6 +1080,8 @@ int kswapd(void *unused)
 		 * we'll be woken up earlier...
 		 */
 		if (!free_shortage() || !inactive_shortage()) {
+            // 代表我们遇到了无限循环的末尾，睡眠一秒钟以后
+            // 再次调度线程执行
 			interruptible_sleep_on_timeout(&kswapd_wait, HZ);
 		/*
 		 * If we couldn't free enough memory, we see if it was
@@ -1142,11 +1195,21 @@ int kreclaimd(void *unused)
 	}
 }
 
-
+//
+// kswapd进程的建立, 这个函数是系统初始化阶段
+// 调用的。
+//
 static int __init kswapd_init(void)
 {
 	printk("Starting kswapd v1.8\n");
+    //
+    // 决定page_cluster参数的值, 这是读磁盘时
+    // 预读取页面的数量。
+    //
 	swap_setup();
+    //
+    // 创建kswapd线程，下面的线程是kreclaimd
+    //
 	kernel_thread(kswapd, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
 	kernel_thread(kreclaimd, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
 	return 0;
