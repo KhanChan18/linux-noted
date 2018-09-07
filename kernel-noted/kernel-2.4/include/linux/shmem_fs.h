@@ -13,6 +13,23 @@
  * We have to move it here, since not every user of fs.h is including
  * mm.h, but m.h is including fs.h via sched .h :-/
  */
+
+//
+// swp_entry_t的结构实际如下：
+// ----------------------------------
+// |       offset       |   type  |0|
+// ----------------------------------
+// 24bit                 7bit      1bit
+//
+// pte_t的结构实际如下：
+// ----------------------------------
+// |start point on phy|     flag  |0|
+// ----------------------------------
+// 20bit               12bit
+//
+// offset: 表示页面在一个磁盘设备或者文件中的位置；
+// type: 表示该交换页面在哪一个文件/设备中
+//
 typedef struct {
 	unsigned long val;
 } swp_entry_t;

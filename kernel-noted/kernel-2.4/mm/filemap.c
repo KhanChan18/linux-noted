@@ -73,7 +73,8 @@ static void add_page_to_hash_queue(struct page * page, struct page **p)
 // 然后将传入的page链接到这个队列里面去
 //
 // 但是这个页面一般是文件使用的，所以名称有inode
-static inline void add_page_to_inode_queue(struct address_space *mapping, struct page * page)
+static inline void add_page_to_inode_queue(
+        struct address_space *mapping, struct page * page)
 {
 	struct list_head *head = &mapping->clean_pages;
 
@@ -494,14 +495,14 @@ void add_to_page_cache_locked(
 	if (!PageLocked(page))
 		BUG();
     
-    // 是一个宏操作，其实只是将这个页面
-    // 的使用计数page->count + 1
+    // 是一个宏操作，其实只是将这个页面的使用计数page->count + 1
 	page_cache_get(page);
 	spin_lock(&pagecache_lock);
 	page->index = index;
     // 这里是将页面链接到mapping中的干净页面队列中
 	add_page_to_inode_queue(mapping, page);
 
+    //
     // 将页面链接到某个hash队列中
     // 计算hash值的方法见：
     // include/linux/pagemap.h 68

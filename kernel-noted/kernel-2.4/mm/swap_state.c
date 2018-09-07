@@ -28,6 +28,10 @@ static struct address_space_operations swap_aops = {
 	sync_page: block_sync_page,
 };
 
+//
+// 
+//
+//
 struct address_space swapper_space = {
 	LIST_HEAD_INIT(swapper_space.clean_pages),
 	LIST_HEAD_INIT(swapper_space.dirty_pages),
@@ -61,6 +65,7 @@ void add_to_swap_cache(struct page *page, swp_entry_t entry)
     // 对正在操作的页面加锁
 	if (!PageLocked(page))
 		BUG();
+    //
     // 这其实是一个宏操作：test_and_set_bit(PG_swap_cache, &(page)->flags)
     // 在校验page的flags参数中PG_swap_cache是否为0；
     // 同时要求page->mapping参数必须是0；

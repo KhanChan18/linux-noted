@@ -20,8 +20,13 @@
 spinlock_t swaplock = SPIN_LOCK_UNLOCKED;
 unsigned int nr_swapfiles;
 
+// 一个队列，开始时是空的，当调用swap_on指定一个
+// 将要被用于页面交换的文件时，这个文件对应的
+// swap_info_struct会被链接到这里面来。
+//
 struct swap_list_t swap_list = {-1, -1};
 
+// 由内核维护，记录了内核可以使用的若干个交换设备
 struct swap_info_struct swap_info[MAX_SWAPFILES];
 
 #define SWAPFILE_CLUSTER 256
@@ -144,6 +149,11 @@ bad_count:
  */
 void __swap_free(swp_entry_t entry, unsigned short count)
 {
+    //
+    // 释放一个磁盘页面中的”释放“，在内核的角度来看
+    // 只不过是通过管理，似的某个磁盘页面对应的数据结构
+    // （swap_info_struct）的引用为0
+    //
 	struct swap_info_struct * p;
 	unsigned long offset, type;
     
@@ -163,7 +173,9 @@ void __swap_free(swp_entry_t entry, unsigned short count)
 		goto bad_device;
 
     // 提取出的offset代表在设备上的页面号，页面号自然不能超过设备
-    // 规定的上限。同时，我们正在释放物理介质，那么没有被引用过的
+    // 规定的上限。
+    //
+    // 同时，我们正在释放物理介质，那么没有被引用过的
     // 设备页面自然也就不能被释放。
 	offset = SWP_OFFSET(entry);
 	if (offset >= p->max)

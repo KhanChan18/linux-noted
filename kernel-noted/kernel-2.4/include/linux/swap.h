@@ -46,19 +46,34 @@ union swap_header {
 #define SWAP_MAP_MAX	0x7fff
 #define SWAP_MAP_BAD	0x8000
 
+//
+// 用来描述和管理那些用于交换的设备或者文件
+//
 struct swap_info_struct {
 	unsigned int flags;
 	kdev_t swap_device;
 	spinlock_t sdev_lock;
 	struct dentry * swap_file;
 	struct vfsmount *swap_vfsmnt;
+    //
+    // 每个unsigned short代表盘上一物理页面，数组的index就是
+    // 这物理页面在盘上或者文件上的位置。swap_map[0]一般不是
+    // 用来交换的，而用来记录设备元数据；
+    //
 	unsigned short * swap_map;
+    //
+    // 表明文件或者设备中哪个区间中的页面是用于交换的。
+    //
 	unsigned int lowest_bit;
 	unsigned int highest_bit;
+    //
+    // 分配磁盘上页面空间时尽可能要靠集群的方式进行分配
+    //
 	unsigned int cluster_next;
 	unsigned int cluster_nr;
 	int prio;			/* swap priority */
 	int pages;
+    // 设备中的最大页面号，表示了设备的物理大小
 	unsigned long max;
 	int next;			/* next entry on swap list */
 };
